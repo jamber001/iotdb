@@ -158,7 +158,7 @@ public class VectorMeasurementSchema
   }
 
   @Override
-  public List<String> getValueMeasurementIdList() {
+  public List<String> getSubMeasurementsList() {
     String[] measurements = new String[measurementsToIndexMap.size()];
     for (Map.Entry<String, Integer> entry : measurementsToIndexMap.entrySet()) {
       measurements[entry.getValue()] = entry.getKey();
@@ -167,7 +167,7 @@ public class VectorMeasurementSchema
   }
 
   @Override
-  public List<TSDataType> getValueTSDataTypeList() {
+  public List<TSDataType> getSubMeasurementsTSDataTypeList() {
     List<TSDataType> dataTypeList = new ArrayList<>();
     for (byte dataType : types) {
       dataTypeList.add(TSDataType.deserialize(dataType));
@@ -176,7 +176,7 @@ public class VectorMeasurementSchema
   }
 
   @Override
-  public List<TSEncoding> getValueTSEncodingList() {
+  public List<TSEncoding> getSubMeasurementsTSEncodingList() {
     List<TSEncoding> encodingList = new ArrayList<>();
     for (byte encoding : encodings) {
       encodingList.add(TSEncoding.deserialize(encoding));

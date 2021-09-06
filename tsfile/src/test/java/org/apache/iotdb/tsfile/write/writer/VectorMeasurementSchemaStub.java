@@ -79,17 +79,17 @@ public class VectorMeasurementSchemaStub implements IMeasurementSchema {
   }
 
   @Override
-  public List<String> getValueMeasurementIdList() {
+  public List<String> getSubMeasurementsList() {
     return Arrays.asList("s1", "s2", "s3");
   }
 
   @Override
-  public List<TSDataType> getValueTSDataTypeList() {
+  public List<TSDataType> getSubMeasurementsTSDataTypeList() {
     return Arrays.asList(TSDataType.FLOAT, TSDataType.INT32, TSDataType.DOUBLE);
   }
 
   @Override
-  public List<TSEncoding> getValueTSEncodingList() {
+  public List<TSEncoding> getSubMeasurementsTSEncodingList() {
     return Arrays.asList(TSEncoding.PLAIN, TSEncoding.PLAIN, TSEncoding.PLAIN);
   }
 
