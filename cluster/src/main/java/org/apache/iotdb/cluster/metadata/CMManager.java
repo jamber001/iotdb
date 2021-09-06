@@ -998,7 +998,7 @@ public class CMManager extends MManager {
         } catch (CheckConsistencyException e) {
           logger.warn("Failed to check consistency.", e);
         }
-        List<PartialPath> allTimeseriesName = getMatchedPathsLocally(pathUnderSG, withAlias);
+        List<PartialPath> allTimeseriesName = getAllTimeseriesPaths(pathUnderSG);
         logger.debug(
             "{}: get matched paths of {} locally, result {}",
             metaGroupMember.getName(),
@@ -1021,15 +1021,6 @@ public class CMManager extends MManager {
     }
 
     return result;
-  }
-
-  private List<PartialPath> getMatchedPathsLocally(PartialPath partialPath, boolean withAlias)
-      throws MetadataException {
-    if (!withAlias) {
-      return getAllTimeseriesPath(partialPath);
-    } else {
-      return super.getAllTimeseriesPathWithAlias(partialPath, -1, -1).left;
-    }
   }
 
   private List<PartialPath> getMatchedPaths(
@@ -1229,7 +1220,7 @@ public class CMManager extends MManager {
 
   /** Similar to method getAllTimeseriesPath(), but return Path with alias alias. */
   @Override
-  public Pair<List<PartialPath>, Integer> getAllTimeseriesPathWithAlias(
+  public Pair<List<PartialPath>, Integer> getAllTimeseriesPathsWithAlias(
       PartialPath prefixPath, int limit, int offset) throws MetadataException {
 
     // get all storage groups this path may belong to
@@ -1323,7 +1314,7 @@ public class CMManager extends MManager {
   public List<String> getAllPaths(List<String> paths) throws MetadataException {
     List<String> ret = new ArrayList<>();
     for (String path : paths) {
-      getAllTimeseriesPath(new PartialPath(path)).stream()
+      getAllTimeseriesPaths(new PartialPath(path)).stream()
           .map(PartialPath::getFullPath)
           .forEach(ret::add);
     }
@@ -1729,27 +1720,22 @@ public class CMManager extends MManager {
 
   public GetAllPathsResult getAllPaths(List<String> paths, boolean withAlias)
       throws MetadataException {
-    List<String> retPaths = new ArrayList<>();
+    List<PartialPath> retPaths = new ArrayList<>();
     List<String> alias = null;
-    if (withAlias) {
-      alias = new ArrayList<>();
+    for (String path : paths) {
+      retPaths.addAll(getAllTimeseriesPaths(new PartialPath(path)));
     }
 
     if (withAlias) {
-      for (String path : paths) {
-        List<PartialPath> allTimeseriesPathWithAlias =
-            super.getAllTimeseriesPathWithAlias(new PartialPath(path), -1, -1).left;
-        for (PartialPath timeseriesPathWithAlias : allTimeseriesPathWithAlias) {
-          retPaths.add(timeseriesPathWithAlias.getFullPath());
-          alias.add(timeseriesPathWithAlias.getMeasurementAlias());
-        }
+      alias = new ArrayList<>();
+      for (PartialPath path : retPaths) {
+        alias.add(path.getMeasurementAlias());
       }
-    } else {
-      retPaths = getAllPaths(paths);
     }
 
     GetAllPathsResult getAllPathsResult = new GetAllPathsResult();
-    getAllPathsResult.setPaths(retPaths);
+    getAllPathsResult.setPaths(
+        retPaths.stream().map(PartialPath::getFullPath).collect(Collectors.toList()));
     getAllPathsResult.setAliasList(alias);
     return getAllPathsResult;
   }

@@ -83,6 +83,14 @@ public abstract class MNode implements IMNode {
     return new PartialPath(detachedPath.toArray(new String[0]));
   }
 
+  public PartialPath getPartialPathWithAlias() {
+    PartialPath result = getPartialPath();
+    if (this instanceof MeasurementMNode) {
+      result.setMeasurementAlias(((MeasurementMNode) this).getAlias());
+    }
+    return result;
+  }
+
   /** get full path */
   @Override
   public String getFullPath() {

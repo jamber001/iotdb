@@ -545,7 +545,7 @@ public class MManagerBasicTest {
     MManager manager = IoTDB.metaManager;
 
     try {
-      assertTrue(manager.getAllTimeseriesPath(new PartialPath("root")).isEmpty());
+      assertTrue(manager.getAllTimeseriesPaths(new PartialPath("root")).isEmpty());
       assertTrue(manager.getStorageGroupByPath(new PartialPath("root.vehicle")).isEmpty());
       assertTrue(manager.getStorageGroupByPath(new PartialPath("root.vehicle.device")).isEmpty());
       assertTrue(

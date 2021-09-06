@@ -592,7 +592,7 @@ public class MManager {
       mNodeCache.clear();
     }
     try {
-      List<PartialPath> allTimeseries = mtree.getAllTimeseriesPath(prefixPath);
+      List<PartialPath> allTimeseries = mtree.getAllTimeseriesPaths(prefixPath);
       if (allTimeseries.isEmpty()) {
         throw new PathNotExistException(prefixPath.getFullPath());
       }
@@ -874,14 +874,13 @@ public class MManager {
    * @param prefixPath can be a prefix or a full path. if the wildcard is not at the tail, then each
    *     wildcard can only match one level, otherwise it can match to the tail.
    */
-  public List<PartialPath> getAllTimeseriesPath(PartialPath prefixPath) throws MetadataException {
-    return mtree.getAllTimeseriesPath(prefixPath);
+  public List<PartialPath> getAllTimeseriesPaths(PartialPath prefixPath) throws MetadataException {
+    return mtree.getAllTimeseriesPaths(prefixPath);
   }
 
-  /** Similar to method getAllTimeseriesPath(), but return Path with alias. */
-  public Pair<List<PartialPath>, Integer> getAllTimeseriesPathWithAlias(
+  public Pair<List<PartialPath>, Integer> getAllTimeseriesPathsWithAlias(
       PartialPath prefixPath, int limit, int offset) throws MetadataException {
-    return mtree.getAllTimeseriesPathWithAlias(prefixPath, limit, offset);
+    return mtree.getAllTimeseriesPaths(prefixPath, limit, offset);
   }
 
   /** To calculate the count of timeseries for given prefix path. */

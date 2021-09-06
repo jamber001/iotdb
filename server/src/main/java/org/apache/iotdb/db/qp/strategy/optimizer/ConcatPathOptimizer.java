@@ -207,8 +207,7 @@ public class ConcatPathOptimizer implements ILogicalOptimizer {
     HashSet<PartialPath> actualPaths = new HashSet<>();
     try {
       for (PartialPath originalPath : originalPaths) {
-        List<PartialPath> all =
-            IoTDB.metaManager.getAllTimeseriesPathWithAlias(originalPath, 0, 0).left;
+        List<PartialPath> all = IoTDB.metaManager.getAllTimeseriesPaths(originalPath);
         if (all.isEmpty()) {
           throw new LogicalOptimizeException(
               String.format("Unknown time series %s in `where clause`", originalPath));

@@ -24,6 +24,7 @@ import org.apache.iotdb.db.exception.metadata.MetadataException;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.metadata.PartialPath;
 import org.apache.iotdb.db.metadata.mnode.IMNode;
+import org.apache.iotdb.db.metadata.mnode.MeasurementMNode;
 import org.apache.iotdb.db.metadata.template.Template;
 import org.apache.iotdb.db.qp.physical.crud.AggregationPlan;
 import org.apache.iotdb.db.qp.physical.crud.AlignByDevicePlan;
@@ -43,6 +44,8 @@ import org.apache.iotdb.tsfile.read.common.RowRecord;
 import org.apache.iotdb.tsfile.read.expression.IExpression;
 import org.apache.iotdb.tsfile.read.query.dataset.QueryDataSet;
 import org.apache.iotdb.tsfile.utils.Binary;
+import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
+import org.apache.iotdb.tsfile.write.schema.VectorMeasurementSchema;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -177,7 +180,6 @@ public class AlignByDeviceDataSet extends QueryDataSet {
             groupByTimePlan.setDeduplicatedDataTypes(tsDataTypes);
             groupByTimePlan.setDeduplicatedAggregations(executeAggregations);
             groupByTimePlan.setExpression(expression);
-            groupByTimePlan.transformPaths(IoTDB.metaManager);
             currentDataSet = queryRouter.groupBy(groupByTimePlan, context);
             break;
           case AGGREGATE:
@@ -185,20 +187,17 @@ public class AlignByDeviceDataSet extends QueryDataSet {
             aggregationPlan.setDeduplicatedAggregations(executeAggregations);
             aggregationPlan.setDeduplicatedDataTypes(tsDataTypes);
             aggregationPlan.setExpression(expression);
-            aggregationPlan.transformPaths(IoTDB.metaManager);
             currentDataSet = queryRouter.aggregate(aggregationPlan, context);
             break;
           case FILL:
             fillQueryPlan.setDeduplicatedDataTypes(tsDataTypes);
             fillQueryPlan.setDeduplicatedPathsAndUpdate(executePaths);
-            fillQueryPlan.transformPaths(IoTDB.metaManager);
             currentDataSet = queryRouter.fill(fillQueryPlan, context);
             break;
           case QUERY:
             rawDataQueryPlan.setDeduplicatedPathsAndUpdate(executePaths);
             rawDataQueryPlan.setDeduplicatedDataTypes(tsDataTypes);
             rawDataQueryPlan.setExpression(expression);
-            rawDataQueryPlan.transformPaths(IoTDB.metaManager);
             currentDataSet = queryRouter.rawDataQuery(rawDataQueryPlan, context);
             break;
           default:
@@ -206,8 +205,7 @@ public class AlignByDeviceDataSet extends QueryDataSet {
         }
       } catch (QueryProcessException
           | QueryFilterOptimizationException
-          | StorageEngineException
-          | MetadataException e) {
+          | StorageEngineException e) {
         throw new IOException(e);
       }
 
@@ -230,9 +228,16 @@ public class AlignByDeviceDataSet extends QueryDataSet {
   protected Set<String> getDeviceMeasurements(PartialPath device) throws IOException {
     try {
       IMNode deviceNode = IoTDB.metaManager.getNodeByPath(device);
-      Set<String> res = new HashSet<>(deviceNode.getChildren().keySet());
+      Set<String> res = new HashSet<>();
       for (IMNode mnode : deviceNode.getChildren().values()) {
-        res.addAll(mnode.getChildren().keySet());
+        IMeasurementSchema measurementSchema = ((MeasurementMNode) mnode).getSchema();
+        if (measurementSchema instanceof VectorMeasurementSchema) {
+          for (String subMeasurement : measurementSchema.getSubMeasurementsList()) {
+            res.add(mnode.getName() + "." + subMeasurement);
+          }
+        } else {
+          res.add(mnode.getName());
+        }
       }
 
       Template template = deviceNode.getUpperTemplate();

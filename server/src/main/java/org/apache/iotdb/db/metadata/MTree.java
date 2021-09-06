@@ -968,48 +968,6 @@ public class MTree implements Serializable {
   }
 
   /**
-   * Get all timeseries under the given path
-   *
-   * @param prefixPath a prefix path or a full path, may contain '*'.
-   */
-  List<PartialPath> getAllTimeseriesPath(PartialPath prefixPath) throws MetadataException {
-    List<PartialPath> resultPathList = new ArrayList<>();
-    findPath(root, prefixPath.getNodes(), 1, resultPathList, null);
-    return resultPathList;
-  }
-
-  /**
-   * Get all timeseries paths under the given path
-   *
-   * @param prefixPath a prefix path or a full path, may contain '*'.
-   * @return Pair.left contains all the satisfied paths Pair.right means the current offset or zero
-   *     if we don't set offset.
-   */
-  Pair<List<PartialPath>, Integer> getAllTimeseriesPathWithAlias(
-      PartialPath prefixPath, int limit, int offset) throws MetadataException {
-    PartialPath prePath = new PartialPath(prefixPath.getNodes());
-    ShowTimeSeriesPlan plan = new ShowTimeSeriesPlan(prefixPath);
-    plan.setLimit(limit);
-    plan.setOffset(offset);
-    List<String[]> res = getAllMeasurementSchema(plan, false);
-    List<PartialPath> paths = new ArrayList<>();
-    for (String[] s : res) {
-      PartialPath path = new PartialPath(s[0]);
-      if (prePath.getMeasurement().equals(s[1])) {
-        path.setMeasurementAlias(s[1]);
-      }
-      paths.add(path);
-    }
-    if (curOffset.get() == null) {
-      offset = 0;
-    } else {
-      offset = curOffset.get() + 1;
-    }
-    curOffset.remove();
-    return new Pair<>(paths, offset);
-  }
-
-  /**
    * Get the count of timeseries under the given prefix path. if prefixPath contains '*', then not
    * throw PathNotExistException()
    *
@@ -1191,6 +1149,39 @@ public class MTree implements Serializable {
   }
 
   /**
+   * Get all timeseries under the given path
+   *
+   * @param prefixPath a prefix path or a full path, may contain '*'.
+   */
+  List<PartialPath> getAllTimeseriesPaths(PartialPath prefixPath) throws MetadataException {
+    List<PartialPath> resultPathList = new ArrayList<>();
+    findAllPaths(root, prefixPath.getNodes(), 1, resultPathList, null);
+    return resultPathList;
+  }
+
+  /**
+   * Get all timeseries paths under the given path
+   *
+   * @param prefixPath a prefix path or a full path, may contain '*'.
+   * @return Pair.left contains all the satisfied paths Pair.right means the current offset or zero
+   *     if we don't set offset.
+   */
+  Pair<List<PartialPath>, Integer> getAllTimeseriesPaths(
+      PartialPath prefixPath, int limit, int offset) throws MetadataException {
+    List<PartialPath> paths = getAllTimeseriesPaths(prefixPath);
+    if (limit != 0 || offset != 0) {
+      int delta = offset - paths.size();
+      offset = Math.max(delta, 0);
+      if (delta > 0) {
+        return new Pair<>(new ArrayList<>(), offset);
+      } else if (paths.size() > limit + offset) {
+        paths = paths.subList(offset, offset + limit);
+      }
+    }
+    return new Pair<>(paths, offset);
+  }
+
+  /**
    * Get all time series schema under the given path order by insert frequency
    *
    * <p>result: [name, alias, storage group, dataType, encoding, compression, offset]
@@ -1203,7 +1194,7 @@ public class MTree implements Serializable {
     }
     List<String[]> allMatchedNodes = new ArrayList<>();
 
-    findPath(root, nodes, 1, allMatchedNodes, false, true, queryContext, null);
+    findTimeSeriesSchema(root, nodes, 1, allMatchedNodes, false, true, queryContext, null);
 
     Stream<String[]> sortedStream =
         allMatchedNodes.stream()
@@ -1240,7 +1231,8 @@ public class MTree implements Serializable {
     offset.set(plan.getOffset());
     curOffset.set(-1);
     count.set(0);
-    findPath(root, nodes, 1, res, offset.get() != 0 || limit.get() != 0, false, null, null);
+    findTimeSeriesSchema(
+        root, nodes, 1, res, offset.get() != 0 || limit.get() != 0, false, null, null);
     // avoid memory leaks
     limit.remove();
     offset.remove();
@@ -1257,15 +1249,15 @@ public class MTree implements Serializable {
    * <p>Iterate through MTree to fetch metadata info of all leaf nodes under the given seriesPath
    *
    * @param needLast if false, lastTimeStamp in timeseriesSchemaList will be null
-   * @param timeseriesSchemaList List<String[]> result: [name, alias, storage group, dataType,
+   * @param measurementNodeList List<String[]> result: [name, alias, storage group, dataType,
    *     encoding, compression, offset, lastTimeStamp]
    */
   @SuppressWarnings("squid:S3776") // Suppress high Cognitive Complexity warning
-  private void findPath(
+  private void findTimeSeriesSchema(
       IMNode curNode,
       String[] nodes,
       int childIndex,
-      List<String[]> timeseriesSchemaList,
+      List<String[]> measurementNodeList,
       boolean hasLimit,
       boolean needLast,
       QueryContext queryContext,
@@ -1286,10 +1278,10 @@ public class MTree implements Serializable {
         IMeasurementSchema measurementSchema = measurementMNode.getSchema();
 
         if (measurementSchema instanceof MeasurementSchema) {
-          timeseriesSchemaList.add(getTimeseriesInfo(measurementMNode, needLast, queryContext));
+          measurementNodeList.add(getTimeseriesInfo(measurementMNode, needLast, queryContext));
         } else if (measurementSchema instanceof VectorMeasurementSchema) {
           String nextNode = MetaUtils.getNodeRegByIdx(childIndex, nodes);
-          timeseriesSchemaList.addAll(
+          measurementNodeList.addAll(
               getVectorTimeseriesInfo(measurementMNode, needLast, queryContext, nextNode));
         }
         if (hasLimit) {
@@ -1308,11 +1300,11 @@ public class MTree implements Serializable {
     if (!nodeReg.contains(PATH_WILDCARD)) {
       IMNode next = curNode.getChild(nodeReg);
       if (next != null) {
-        findPath(
+        findTimeSeriesSchema(
             next,
             nodes,
             childIndex + 1,
-            timeseriesSchemaList,
+            measurementNodeList,
             hasLimit,
             needLast,
             queryContext,
@@ -1323,11 +1315,11 @@ public class MTree implements Serializable {
         if (!Pattern.matches(nodeReg.replace("*", ".*"), child.getName())) {
           continue;
         }
-        findPath(
+        findTimeSeriesSchema(
             child,
             nodes,
             childIndex + 1,
-            timeseriesSchemaList,
+            measurementNodeList,
             hasLimit,
             needLast,
             queryContext,
@@ -1346,7 +1338,7 @@ public class MTree implements Serializable {
           if (set.add(schema)) {
             if (schema instanceof MeasurementSchema) {
               if (Pattern.matches(nodeReg.replace("*", ".*"), schema.getMeasurementId())) {
-                timeseriesSchemaList.add(
+                measurementNodeList.add(
                     getTimeseriesInfo(
                         new MeasurementMNode(curNode, schema.getMeasurementId(), schema, null),
                         needLast,
@@ -1357,7 +1349,7 @@ public class MTree implements Serializable {
               if (Pattern.matches(
                   nodeReg.replace("*", ".*"), vectorMeasurementSchema.getMeasurementId())) {
                 String firstNode = vectorMeasurementSchema.getSubMeasurementsList().get(0);
-                timeseriesSchemaList.addAll(
+                measurementNodeList.addAll(
                     getVectorTimeseriesInfoForTemplate(
                         new MeasurementMNode(curNode, firstNode, schema, null),
                         needLast,
@@ -1379,7 +1371,7 @@ public class MTree implements Serializable {
    * <p>Iterate through MTree to fetch metadata info of all leaf nodes under the given seriesPath
    */
   @SuppressWarnings("squid:S3776") // Suppress high Cognitive Complexity warning
-  private void findPath(
+  private void findAllPaths(
       IMNode curNode,
       String[] nodes,
       int childIndex,
@@ -1412,14 +1404,14 @@ public class MTree implements Serializable {
     if (!nodeReg.contains(PATH_WILDCARD)) {
       IMNode next = curNode.getChild(nodeReg);
       if (next != null) {
-        findPath(next, nodes, childIndex + 1, pathList, upperTemplate);
+        findAllPaths(next, nodes, childIndex + 1, pathList, upperTemplate);
       }
     } else {
       for (IMNode child : curNode.getChildren().values()) {
         if (!Pattern.matches(nodeReg.replace("*", ".*"), child.getName())) {
           continue;
         }
-        findPath(child, nodes, childIndex + 1, pathList, upperTemplate);
+        findAllPaths(child, nodes, childIndex + 1, pathList, upperTemplate);
       }
     }
 
@@ -1536,7 +1528,7 @@ public class MTree implements Serializable {
       if (!Pattern.matches(nextNode.replace("*", ".*"), subMeasurement)) {
         continue;
       }
-      paths.add(new PartialPath(node.getPartialPath().getFullPath(), subMeasurement));
+      paths.add(new VectorPartialPath(node.getPartialPath().getFullPath(), subMeasurement));
     }
     return paths;
   }
