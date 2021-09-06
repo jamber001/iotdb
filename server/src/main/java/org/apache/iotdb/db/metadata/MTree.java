@@ -1271,29 +1271,30 @@ public class MTree implements Serializable {
       QueryContext queryContext,
       Template upperTemplate)
       throws MetadataException {
-    if (curNode instanceof MeasurementMNode
-        // For example: nodes: [root, sg, d1, s1, ss1], mTree: root.sg.d1.s1
-        // node: root.sg.d1.s1, childIndex = 4 < length, will not be chosen
-        && (nodes.length <= childIndex
-            || ((MeasurementMNode) curNode).getSchema() instanceof VectorMeasurementSchema)) {
-      if (hasLimit) {
-        curOffset.set(curOffset.get() + 1);
-        if (curOffset.get() < offset.get() || count.get().intValue() == limit.get().intValue()) {
-          return;
+    if (curNode.isMeasurement()) {
+      // For example: nodes: [root, sg, d1, s1, ss1], mTree: root.sg.d1.s1
+      // node: root.sg.d1.s1, childIndex = 4 < length, will not be chosen
+      if (nodes.length <= childIndex
+          || ((MeasurementMNode) curNode).getSchema() instanceof VectorMeasurementSchema) {
+        if (hasLimit) {
+          curOffset.set(curOffset.get() + 1);
+          if (curOffset.get() < offset.get() || count.get().intValue() == limit.get().intValue()) {
+            return;
+          }
         }
-      }
-      MeasurementMNode measurementMNode = (MeasurementMNode) curNode;
-      IMeasurementSchema measurementSchema = measurementMNode.getSchema();
+        MeasurementMNode measurementMNode = (MeasurementMNode) curNode;
+        IMeasurementSchema measurementSchema = measurementMNode.getSchema();
 
-      if (measurementSchema instanceof MeasurementSchema) {
-        timeseriesSchemaList.add(getTimeseriesInfo(measurementMNode, needLast, queryContext));
-      } else if (measurementSchema instanceof VectorMeasurementSchema) {
-        String nextNode = MetaUtils.getNodeRegByIdx(childIndex, nodes);
-        timeseriesSchemaList.addAll(
-            getVectorTimeseriesInfo(measurementMNode, needLast, queryContext, nextNode));
-      }
-      if (hasLimit) {
-        count.set(count.get() + 1);
+        if (measurementSchema instanceof MeasurementSchema) {
+          timeseriesSchemaList.add(getTimeseriesInfo(measurementMNode, needLast, queryContext));
+        } else if (measurementSchema instanceof VectorMeasurementSchema) {
+          String nextNode = MetaUtils.getNodeRegByIdx(childIndex, nodes);
+          timeseriesSchemaList.addAll(
+              getVectorTimeseriesInfo(measurementMNode, needLast, queryContext, nextNode));
+        }
+        if (hasLimit) {
+          count.set(count.get() + 1);
+        }
       }
       return;
     }
@@ -1385,18 +1386,19 @@ public class MTree implements Serializable {
       List<PartialPath> pathList,
       Template upperTemplate)
       throws MetadataException {
-    if (curNode instanceof MeasurementMNode
-        // For example: nodes: [root, sg, d1, s1, ss1], mtree: root.sg.d1.s1
-        // node: root.sg.d1.s1, idx = 4 < length, will not be chosen
-        && (nodes.length <= childIndex
-            || ((MeasurementMNode) curNode).getSchema() instanceof VectorMeasurementSchema)) {
-      MeasurementMNode measurementMNode = (MeasurementMNode) curNode;
-      IMeasurementSchema measurementSchema = ((MeasurementMNode) curNode).getSchema();
-      if (measurementSchema instanceof MeasurementSchema) {
-        pathList.add(curNode.getPartialPath());
-      } else if (measurementSchema instanceof VectorMeasurementSchema) {
-        String nextNode = MetaUtils.getNodeRegByIdx(childIndex, nodes);
-        pathList.addAll(getVectorMeasurementPaths(measurementMNode, nextNode));
+    if (curNode.isMeasurement()) {
+      // For example: nodes: [root, sg, d1, s1, ss1], mtree: root.sg.d1.s1
+      // node: root.sg.d1.s1, idx = 4 < length, will not be chosen
+      if (nodes.length <= childIndex
+          || ((MeasurementMNode) curNode).getSchema() instanceof VectorMeasurementSchema) {
+        MeasurementMNode measurementMNode = (MeasurementMNode) curNode;
+        IMeasurementSchema measurementSchema = ((MeasurementMNode) curNode).getSchema();
+        if (measurementSchema instanceof MeasurementSchema) {
+          pathList.add(curNode.getPartialPath());
+        } else if (measurementSchema instanceof VectorMeasurementSchema) {
+          String nextNode = MetaUtils.getNodeRegByIdx(childIndex, nodes);
+          pathList.addAll(getVectorMeasurementPaths(measurementMNode, nextNode));
+        }
       }
       return;
     }
